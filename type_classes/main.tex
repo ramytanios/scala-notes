@@ -1,0 +1,147 @@
+\documentclass[11pt]{article}
+
+\usepackage{sectsty}
+\usepackage{graphicx}
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\renewcommand{\familydefault}{\sfdefault}
+\newcommand\func[1]{\textcolor{blue}{\texttt{#1}}}
+
+\lstdefinestyle{myScalastyle}{
+  frame=tb,
+  language=scala,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3,
+}
+% Margins
+\topmargin=-0.45in
+\evensidemargin=0in
+\oddsidemargin=0in
+\textwidth=6.5in
+\textheight=9.0in
+\headsep=0.25in
+
+\title{Scala type classes (Cats)}
+\author{ Ramy Tanios }
+\date{\today}
+
+\begin{document}
+\maketitle	
+\pagebreak
+
+
+\section{Cats type classes}
+Sample implementations are presented below for the most important type classes supported by scala and Cats library.
+
+\subsection{Semigroup}
+A \textbf{Semigroup} is a type class that provides the \func{combine} method.
+The following is the trait implementation of a \textbf{Semigroup}: 
+\begin{lstlisting}[style=myScalastyle]
+trait Semigroup[F]{ 
+  def combine(l: F, r: F): F
+}
+\end{lstlisting}
+The \func{combine} method satisfies the associativity propery $f(f(x,y), z) = f(x, f(y,z))$. 
+
+\subsection{Monoid}
+A \textbf{Monoid} is a type class that \textcolor{orange}{\textbf{extends}} a \textbf{Semigroup}, providing in addition to the 
+\func{map} method, a \func{pure} or \func{unit} method. The following is a trait implementation of a \textbf{Monoid}: 
+\begin{lstlisting}[style=myScalaStyle]
+trait Monoid[F]{ 
+  def unit: F 
+  def combine(l: F, r: F): F
+}
+\end{lstlisting}
+The former methods should follow the follow properties: 
+\begin{itemize}
+  \item $f(f(x,y), z) = f(x, f(y,z))$ (associativity). 
+  \item $f(x, 0) = f(0, x) = x$. 
+\end{itemize}
+
+
+
+\subsection{Functor}
+A \textbf{Functor} is a type class that provides the \func{map} method. 
+The \func{map} serves as an \textcolor{magenta}{\textbf{ETW}} pattern: Extract, Transform and Wrap. The following 
+is a trait implementation of a \textbf{Functor}: 
+\begin{lstlisting}[style=myScalastyle]
+trait Functor[F[_]]{ 
+  def map[A, B](ma: F[A])(f: A => B): F[B]
+}
+\end{lstlisting}
+The \func{map} method should have the following properties: 
+\begin{itemize}
+  \item $map(x)(identity) = x$
+\end{itemize}
+\subsection{Monad}
+A \textbf{Monad} is a type class that provides the \func{pure}, \func{map} and \func{flatMap} methods. 
+A monad \textcolor{orange}{\textbf{extends}} a \textbf{Functor}. The following is a trait implementation 
+of a \textbf{Monad}: 
+\begin{lstlisting}[style=myScalastyle]
+trait Monad[F[_]]{
+  def pure[A](a: A): F[A]
+  def map[A, B](ma: F[A])(f: A => B): F[B]
+  def flatMap[A, B](ma: F[A])(f: A => F[B]): F[B]
+}
+\end{lstlisting}
+
+\subsection{Semigroupal}
+A \textbf{Semigroupal} is a type class that provides the \func{product} method. The following is a trait implementation 
+of a \textbf{Semigroupal}: 
+\begin{lstlisting}[style=myScalastyle]
+trait Semigroupal[F[_]]{ 
+  def product[A, B](ma: F[A], mb: F[B]): F[(A,B)]
+}
+\end{lstlisting}
+Note that a \textbf{Monad} \textcolor{orange}{\textbf{extends}} a \textbf{Semigroupal} as the \func{product} can be implemented 
+using the \func{map} and \func{flatMap} methods as follows:
+\begin{lstlisting}[style=myScalastyle]
+def product[A, B](ma: F[A], mb: F[B]): F[(A,B)] = 
+  ma.flatMap(a => mb.map(b => (a, b)))
+}
+
+def product[A, B](ma: F[A], mb: F[B]): F[(A,B)] = // for comprehension
+  for {
+    a <- ma 
+    b <- mb 
+  } yield (a,b)
+\end{lstlisting}
+
+\subsection{Applicative}
+An \textbf{Applicative} is a type class that implements the \func{pure} and \func{map} methods.
+Note that an \textbf{Applicative} \textcolor{orange}{\textbf{extends}} a \textbf{Functor}.
+\begin{lstlisting}[style=myScalastyle]
+trait Applicative[F[_]]{
+  def pure[A](a: A): F[A]
+  def map[A, B](ma: F[A], mb: F[B])(f: A => B): F[B]
+  def ap[A, B](ma: F[A])(f: F[A => B]): F[B] // provided by scala
+}
+\end{lstlisting}
+Note that an \textbf{Applicative} extends a \textbf{Semigroupal} as the former can implement 
+the \func{product} through the \func{ap} method as follows: 
+\begin{lstlisting}[style=myScalastyle]
+def product[A, B](ma: F[A], mb: F[B]): F[(A,B)] = 
+  ap(ma)(mb.map(b => ((a: A) => b)))
+\end{lstlisting}
+
+
+
+\end{document}
